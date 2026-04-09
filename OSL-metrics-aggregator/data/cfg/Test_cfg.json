@@ -1,0 +1,5 @@
+{
+	"issue_data": "./data/input/all_combined.json",
+	"out_path": "./data/output/all_combined_single_period.json",
+	"processing_method": "hybrid"
+}
