@@ -1,0 +1,34 @@
+{
+  "auth_path": "./data/auth/my_auth.txt",
+  "output_path": "./data/output/example_output.json",
+  "defaults": {
+    "state": "closed",
+    "labels": [],
+    "fields": {
+      "issues": [],
+      "comments": [
+        "body",
+        "userid",
+        "userlogin",
+        "created_at"
+      ],
+      "commits": []
+    }
+  },
+  "targets": [
+    {
+      "repo": "facebook/react",
+      "range": {
+        "start": 1,
+        "end": 2
+      }
+    },
+    {
+      "repo": "JabRef/jabref",
+      "range": {
+        "start": 150,
+        "end": 151
+      }
+    }
+  ]
+}
