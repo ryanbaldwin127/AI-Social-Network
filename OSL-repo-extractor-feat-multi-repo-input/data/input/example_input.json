@@ -1,0 +1,55 @@
+{
+  "auth_path": "./data/auth/my_auth.txt",
+  "output_path": "./data/output/example_output.json",
+  "defaults": {
+    "state": "closed",
+    "labels": [],
+    "fields": {
+      "issues": [],
+      "comments": [
+        "body",
+        "userid",
+        "userlogin",
+        "created_at"
+      ],
+      "commits": []
+    }
+  },
+  "targets": [
+    {
+      "repo": "facebook/react",
+      "range": {
+        "start": 15,
+        "end": 15
+      }
+    },
+    {
+      "repo": "facebook/react",
+      "range": {
+        "start": 1,
+        "end": 1
+      }
+    },
+    {
+      "repo": "JabRef/jabref",
+      "range": {
+        "start": 15,
+        "end": 15
+      }
+    },
+    {
+      "repo": "JabRef/jabref",
+      "range": {
+        "start": 15000,
+        "end": 15000
+      }
+    },
+    {
+      "repo": "JabRef/jabref9000",
+      "range": {
+        "start":1,
+        "end":1
+      }
+    }
+  ]
+}

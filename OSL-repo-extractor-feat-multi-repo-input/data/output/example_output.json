@@ -1,0 +1,195 @@
+{
+  "facebook/react": {
+    "15": {
+      "comments": {
+        "0": {
+          "body": "Whoa! First off, thanks for diving into this. And also for already signing the CLA :)\n\nSecondly (and this is totally on us for not communicating it well): we actually have our site being built with Jekyll and keep the raw files in the master branch @ https://github.com/facebook/react/tree/master/docs (there's a readme there for getting set up in case you aren't familiar with Ruby/Jekyll). Since we build from that, it's important that changes to documentation are actually made there, and then we compile that and check it into the gh-pages branch.\n",
+          "userid": "8445",
+          "userlogin": "zpao",
+          "created_at": "2013-05-30T17:16:51Z"
+        },
+        "1": {
+          "body": "Hi Paul. No problem. I realised the docs were built with Jekyll, I just generated the site, and created a pull request of the generated files in the `gh-pages` branch and not modifications to the raw files in the `master` branch. So not an issue with communication but more a “D’oh!” moment from me.\n\nHow would you like me to proceed? Create a separate pull request containing my changes to the docs’ raw files in the `master` branch? Will you then generate/update the `gh-pages` branch from there?\n",
+          "userid": "167312",
+          "userlogin": "martinbean",
+          "created_at": "2013-05-30T17:20:11Z"
+        },
+        "2": {
+          "body": "Yea, a separate pull request against `master` is probably best. I don't think GH lets you repurpose a pull request against a different branch.\n\nWe'll then update `gh-pages` separately (so far we've rolled up multiple changes into one commit there)\n",
+          "userid": "8445",
+          "userlogin": "zpao",
+          "created_at": "2013-05-30T18:19:03Z"
+        },
+        "3": {
+          "body": "OK. New Pull Request will be coming in just a few moments!\n",
+          "userid": "167312",
+          "userlogin": "martinbean",
+          "created_at": "2013-05-30T18:25:22Z"
+        },
+        "4": {
+          "body": "Updated pull request: #25.\n",
+          "userid": "167312",
+          "userlogin": "martinbean",
+          "created_at": "2013-05-30T18:32:31Z"
+        }
+      }
+    },
+    "1": {
+      "comments": {
+        "0": {
+          "body": "A++, merge away when you're ready\n",
+          "userid": "8445",
+          "userlogin": "zpao",
+          "created_at": "2013-06-03T17:39:44Z"
+        },
+        "1": {
+          "body": "I like this much better than our current test system.\n\nBut isn't it masking the fact that dumpCache() doesn't work consistently between our phantom and jstest test runners? I think that's why we had the original issue where the reactRoot count was not reset when running in phantom. Doesn't that mean that some tests will pass in phantom (because they're better isolated) and fail in jstest?\n",
+          "userid": "239742",
+          "userlogin": "petehunt",
+          "created_at": "2013-06-03T17:43:01Z"
+        },
+        "2": {
+          "body": "@petehunt good question. I believe jstest actually creates a new window environment for each test, which would mean that the `<iframe>` strategy is as close as we can get in a real browser: https://phabricator.fb.com/diffusion/E/browse/tfb/trunk/www/scripts/third_party/jstest/runner/run-single-jstest.js\n\nSo I think/hope that we will have fewer disagreements between phantom and jstest.\n\nIt's still masking the fact that `dumpCache` doesn't work the same way, yes. But making `dumpCache` work would require rewriting the module system that Browserify uses. That's not out of the question by any means, but right now it's nice to be testing the same imperfect module system that we ship in production Browserify bundles.\n\ncc @jeffmo who might know better\n",
+          "userid": "5750",
+          "userlogin": "benjamn",
+          "created_at": "2013-06-03T17:56:53Z"
+        },
+        "3": {
+          "body": ":+1: \n",
+          "userid": "239742",
+          "userlogin": "petehunt",
+          "created_at": "2013-06-03T17:58:24Z"
+        },
+        "4": {
+          "body": "\n<!--\n  0 failure: \n  1 warning:  Coverage data had...\n  1 messages\n  \n  DangerID: danger-id-Danger;\n-->\n\n\n<table>\n  <thead>\n    <tr>\n      <th width=\"50\"></th>\n      <th width=\"100%\" data-danger-table=\"true\">Warnings</th>\n    </tr>\n  </thead>\n  <tbody><tr>\n      <td>:warning:</td>\n      <td>Coverage data had invalid formatting at path '/Users/karthick.s/Documents/cloudqwest/tracking-frontend-client/coverage/coverage-final.json'</td>\n    </tr>\n  </tbody>\n</table>\n\n\n<table>\n  <thead>\n    <tr>\n      <th width=\"50\"></th>\n      <th width=\"100%\" data-danger-table=\"true\">Messages</th>\n    </tr>\n  </thead>\n  <tbody><tr>\n      <td>:book:</td>\n      <td>No TypeScript/JavaScript files were modified in the src directory.</td>\n    </tr>\n  </tbody>\n</table>\n\n\n<p align=\"right\">\n  Generated by :no_entry_sign: <a href=\"https://danger.systems/js\">dangerJS</a> against 603c9ef6a8d70d3cf29ee9d0a9d7969abce48ac4\n</p>\n",
+          "userid": "67901098",
+          "userlogin": "release-fk",
+          "created_at": "2025-06-23T21:14:56Z"
+        },
+        "5": {
+          "body": "Test comment from Round 2",
+          "userid": "176375917",
+          "userlogin": "robin-park-querypie",
+          "created_at": "2026-01-27T12:40:02Z"
+        },
+        "6": {
+          "body": "<!-- PDD_WORKFLOW_STATE:e2e_fix:issue-1\n{\n  \"workflow\": \"e2e_fix\",\n  \"issue_url\": \"https://github.com/facebook/react/issues/1\",\n  \"issue_number\": 1,\n  \"current_cycle\": 1,\n  \"last_completed_step\": 1,\n  \"step_outputs\": {\n    \"1\": \"I've completed the analysis and posted my findings to the GitHub issue. \\n\\n## Summary\\n\\nAfter thoroughly analyzing GitHub issue #1 from facebook/react, I've determined that:\\n\\n1. **No Unit Tests Identified**: This issue is a historical React PR from 2013 about test infrastructure (running Jasmine tests in iframes), not a `pdd bug` generated issue with executable unit tests.\\n\\n2. **Missing Expected Content**: The issue lacks:\\n   - Unit test file paths (like `tests/test_*.py`)\\n   - `FILES_CREATED:` sections\\n   - Python test code blocks\\n   - Dev units to fix with `pdd fix`\\n\\n3. **Status Posted**: I've commented on the issue with a detailed report following the required format, explaining that no unit tests were found and therefore no `pdd fix` runs were needed.\\n\\nThe issue appears to be a test case for the workflow system itself, but it doesn't contain the actual unit test content that would be generated by `pdd bug`. For Step 1 to work properly, the issue would need to contain explicit test file paths and associated dev units that can be tested and fixed.\",\n    \"2\": \"FAILED: All agent providers failed\",\n    \"3\": \"FAILED: All agent providers failed\",\n    \"4\": \"FAILED: All agent providers failed\",\n    \"5\": \"FAILED: All agent providers failed\",\n    \"6\": \"FAILED: All agent providers failed\"\n  },\n  \"dev_unit_states\": {},\n  \"total_cost\": 0.16977214999999998,\n  \"model_used\": \"anthropic\",\n  \"changed_files\": [],\n  \"last_saved_at\": \"2026-01-27T14:14:14.028869\",\n  \"github_comment_id\": 3806658996\n}\n-->",
+          "userid": "95069916",
+          "userlogin": "Serhan-Asad",
+          "created_at": "2026-01-27T17:59:49Z"
+        }
+      }
+    }
+  },
+  "JabRef/jabref": {
+    "15": {
+      "comments": {}
+    },
+    "15000": {
+      "comments": {
+        "0": {
+          "body": "/assign-me",
+          "userid": "255565937",
+          "userlogin": "karuppuchamysuresh",
+          "created_at": "2026-02-02T14:17:41Z"
+        },
+        "1": {
+          "body": "Hi, I’d like to work on this issue if it’s still available.",
+          "userid": "70031731",
+          "userlogin": "KeerthanaKrishnamurthy",
+          "created_at": "2026-02-02T17:26:03Z"
+        },
+        "2": {
+          "body": "👋 Hey, looks like you’re eager to work on this issue—great! 🎉 It also looks like you skipped reading our [CONTRIBUTING.md](https://github.com/JabRef/jabref/blob/main/CONTRIBUTING.md), which explains exactly how to participate. No worries, it happens to the best of us. Give it a read, and you’ll discover the ancient wisdom of assigning issues to yourself. Trust me, it’s worth it. 🚀\n<!-- thollander/actions-comment-pull-request \"wisdom\" -->",
+          "userid": "41898282",
+          "userlogin": "github-actions[bot]",
+          "created_at": "2026-02-02T18:00:08Z"
+        },
+        "3": {
+          "body": "/assign-me",
+          "userid": "70031731",
+          "userlogin": "KeerthanaKrishnamurthy",
+          "created_at": "2026-02-02T19:36:00Z"
+        },
+        "4": {
+          "body": "/assign-me",
+          "userid": "70031731",
+          "userlogin": "KeerthanaKrishnamurthy",
+          "created_at": "2026-02-02T19:45:47Z"
+        },
+        "5": {
+          "body": "@KeerthanaKrishnamurthy Please wait until the action succeeds. Look at https://github.com/JabRef/jabref/actions/workflows/on-issue-comment.yml.",
+          "userid": "1366654",
+          "userlogin": "koppor",
+          "created_at": "2026-02-02T19:57:32Z"
+        },
+        "6": {
+          "body": "Understood, thanks. ",
+          "userid": "70031731",
+          "userlogin": "KeerthanaKrishnamurthy",
+          "created_at": "2026-02-02T19:59:24Z"
+        },
+        "7": {
+          "body": "### ⏰ Assignment Reminder\n\nHi @KeerthanaKrishnamurthy, this is a friendly reminder about your assignment to this issue.\n\n> [!WARNING]\n> This issue will be **automatically unassigned** in **7 days** if there's no activity.\n\nRemember that you can ask the [JabRef Guru](https://gurubase.io/g/jabref) or [DeepWiki](https://deepwiki.com/JabRef/jabref) about anything regarding JabRef.\nAdditionally, our contributing guide has [hints on creating a pull request](https://github.com/JabRef/jabref/blob/main/CONTRIBUTING.md#pull-request-process) and a link to our Gitter chat.\n\n<details open>\n<summary>How to keep your assignment</summary>\n\n\\\nIf you are working on it, you can prevent automatic unassignment by:\n\n- Submitting a [draft pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests#draft-pull-requests) with your progress within 7 days\n- Asking for the **📌 Pinned** label if you need more time\n</details>\n\nWe appreciate your contribution and are here to help if needed!",
+          "userid": "41898282",
+          "userlogin": "github-actions[bot]",
+          "created_at": "2026-02-09T12:28:28Z"
+        },
+        "8": {
+          "body": "📌",
+          "userid": "70031731",
+          "userlogin": "KeerthanaKrishnamurthy",
+          "created_at": "2026-02-16T12:18:01Z"
+        },
+        "9": {
+          "body": "Current behavior w/ DOI `10.1145/1028174.971312`\n\n<img width=\"764\" height=\"704\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/72bcf288-ce18-4b65-a317-3f8dcd3cfc3e\" />",
+          "userid": "1366654",
+          "userlogin": "koppor",
+          "created_at": "2026-02-16T21:38:42Z"
+        },
+        "10": {
+          "body": "> 📌\n\nWhy? You can move to another issue if you don't find time within two weeks.",
+          "userid": "1366654",
+          "userlogin": "koppor",
+          "created_at": "2026-02-16T21:39:08Z"
+        },
+        "11": {
+          "body": "That makes sense. Please feel free to de-assign me from this issue. I don’t want to block anyone else who may be ready to work on it within the timeline.\n\nI’ll take some time to look for another good first issue and start contributing there.\n\nThanks for understanding.",
+          "userid": "70031731",
+          "userlogin": "KeerthanaKrishnamurthy",
+          "created_at": "2026-02-16T23:27:46Z"
+        },
+        "12": {
+          "body": "/assign-me",
+          "userid": "184844315",
+          "userlogin": "somya-agarwal2",
+          "created_at": "2026-02-21T13:51:50Z"
+        },
+        "13": {
+          "body": "👋 Hey @somya-agarwal2, thank you for your interest in this issue! 🎉\n\nWe're excited to have you on board. Start by exploring our [Contributing guidelines](https://github.com/JabRef/jabref/blob/main/CONTRIBUTING.md), and set up your local development workspace by following the steps in our [workspace setup guidelines](https://devdocs.jabref.org/getting-into-the-code/guidelines-for-setting-up-a-local-workspace) to get started smoothly.\n\nFor questions on JabRef functionality, you can consult the [JabRef Guru](https://gurubase.io/g/jabref). For questions related to the codebase, please start using [DeepWiki](https://deepwiki.com/JabRef/jabref).\n\nIn case you encounter failing tests during development, please check our [developer FAQs](https://devdocs.jabref.org/code-howtos/faq.html)!\n\nStill facing issues or having more questions? Feel free to ask here on GitHub or on [JabRef's Gitter chat](https://gitter.im/JabRef/jabref). Please don't hesitate to open a (draft) pull request early on to show the direction you are heading towards if unsure.\n\nHappy coding! 🚀\n\nAt this point in time, you raised 0 pull request(s) of which 0% (0/0) have been merged.",
+          "userid": "145191396",
+          "userlogin": "jabref-machine",
+          "created_at": "2026-02-21T13:52:11Z"
+        },
+        "14": {
+          "body": "/assign-me",
+          "userid": "226298700",
+          "userlogin": "andrea02polimi",
+          "created_at": "2026-03-06T18:54:23Z"
+        },
+        "15": {
+          "body": "👋 Hey @andrea02polimi, thank you for your interest in this issue! 🎉\n\nWe're excited to have you on board. Start by exploring our [Contributing guidelines](https://github.com/JabRef/jabref/blob/main/CONTRIBUTING.md), and set up your local development workspace by following the steps in our [workspace setup guidelines](https://devdocs.jabref.org/getting-into-the-code/guidelines-for-setting-up-a-local-workspace) to get started smoothly.\n\nFor questions on JabRef functionality, you can consult the [JabRef Guru](https://gurubase.io/g/jabref). For questions related to the codebase, please start using [DeepWiki](https://deepwiki.com/JabRef/jabref).\n\nIn case you encounter failing tests during development, please check our [developer FAQs](https://devdocs.jabref.org/code-howtos/faq.html)!\n\nStill facing issues or having more questions? Feel free to ask here on GitHub or on [JabRef's Gitter chat](https://gitter.im/JabRef/jabref). Please don't hesitate to open a (draft) pull request early on to show the direction you are heading towards if unsure.\n\nHappy coding! 🚀",
+          "userid": "145191396",
+          "userlogin": "jabref-machine",
+          "created_at": "2026-03-06T18:54:45Z"
+        },
+        "16": {
+          "body": "We think that this issue was fixed. Please head to <https://builds.jabref.org/main> to download a development build and try it out.\n\nFor any feedback, add a comment to the pull request at https://github.com/JabRef/jabref/pull/15286.",
+          "userid": "41898282",
+          "userlogin": "github-actions[bot]",
+          "created_at": "2026-03-09T19:51:34Z"
+        }
+      }
+    }
+  }
+}
