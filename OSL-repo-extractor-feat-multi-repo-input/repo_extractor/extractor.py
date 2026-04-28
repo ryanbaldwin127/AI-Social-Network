@@ -1,0 +1,488 @@
+"""Exposes functionality to mine GitHub repositories."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from copy import deepcopy
+import socket
+import time
+
+import github
+
+from repo_extractor import schema, utils
+
+# ANSI escape sequence for clearing a row in the console:
+# credit: https://stackoverflow.com/a/64245513
+CLR = "\x1b[K"
+TAB = " " * 4
+
+FlushCallback = Callable[[str, dict], None]
+
+
+class GithubSessionError(RuntimeError):
+    """Raised when a GitHub session cannot be established safely."""
+
+
+class ExtractorError(RuntimeError):
+    """Raised when repository extraction cannot complete successfully."""
+
+class RepoNotFoundError(RuntimeError):
+    """Raised when a repository cannot be found."""
+
+
+def issues_in_range(issue_list, low: int, high: int):
+    """Return issues whose number is between low and high (inclusive)."""
+    selected = []
+
+    for issue in issue_list:
+        n = issue.number
+
+        if n < low:
+            continue
+        if n > high:
+            break
+
+        selected.append(issue)
+
+    return selected
+
+
+class GithubSession:
+    """Functionality for verified connections to the GitHub API."""
+
+    __page_len: int
+    session: github.Github
+
+    def __init__(self, auth_path: str) -> None:
+        """
+        Initialize GitHub session object.
+
+        Notes:
+            Paginated lists are set to return 100 items per page. See
+            https://docs.github.com/en/rest/overview/resources-in-the-rest-api#pagination
+            for more information.
+
+        Args:
+            auth_path (str): path to file containing personal access token.
+        """
+        self.__page_len = 100
+        self.session = self.__get_gh_session(auth_path)
+
+    def __get_gh_session(self, auth_path: str) -> github.Github:
+        """
+        Retrieve PAT from auth file and check whether it is valid.
+
+        Args:
+            auth_path (str): path to file containing personal access token.
+
+        Raises:
+            GithubSessionError: string read from file is not a valid
+                Personal Access Token.
+
+        Returns:
+            github.Github: authenticated session object.
+        """
+        token = utils.read_file_line(auth_path)
+        session = github.Github(token, per_page=self.__page_len, retry=100, timeout=100)
+
+        try:
+            session.get_user().id
+        except github.BadCredentialsException as exc:
+            raise GithubSessionError("Invalid personal access token found.") from exc
+        except github.RateLimitExceededException:
+            return session
+
+        return session
+
+    def get_remaining_calls(self) -> str:
+        """Get remaining calls to REST API for this hour."""
+        calls_left = self.session.rate_limiting[0]
+
+        return f"{calls_left:<4d}"
+
+    def get_remaining_ratelimit_time(self) -> int:
+        """
+        Get the remaining time before rate limit resets.
+
+        Note: If this value is not between 1 hour and 00:00 check your
+        system clock for correctness.
+
+        Returns:
+            int: amount of time until ratelimit expires.
+        """
+        return self.session.rate_limiting_resettime - int(time.time())
+
+
+class Extractor:
+    """Extract data for one normalized repository target configuration."""
+
+    def __init__(
+        self,
+        target_cfg: dict,
+        gh_sesh: GithubSession | None = None,
+        flush_callback: FlushCallback | None = None,
+    ) -> None:
+        """
+        Initialize an extractor for one repository target.
+
+        Args:
+            target_cfg (dict): normalized per-target runtime configuration.
+            gh_sesh (GithubSession | None): shared GitHub session to reuse.
+            flush_callback (FlushCallback | None): callback used to persist
+                repo-local output chunks when partial progress should be flushed.
+        """
+        self.cfg = deepcopy(target_cfg)
+        self.flush_callback = flush_callback
+        self.repo_slug = self.cfg["repo"]
+
+        # Reuse a shared authenticated session when supplied by the caller.
+        self.gh_sesh = gh_sesh or GithubSession(self.cfg["auth_path"])
+
+        repo = self.__get_repo_obj()
+
+        clean_range = self.__get_sanitized_cfg_range(repo)
+        self.cfg["range"] = clean_range
+
+        paged_list = self.__get_issues_paged_list(
+            repo,
+            clean_range["start"],
+            self.cfg["state"],
+            self.cfg["labels"],
+        )
+        
+        self.paged_list = issues_in_range(
+            paged_list,
+            clean_range["start"],
+            clean_range["end"],
+        )
+
+    def get_repo_slug(self) -> str:
+        """Return the canonical repo slug for this extraction target."""
+        return self.repo_slug
+
+    def get_target_cfg(self) -> dict:
+        """Return a copy of the normalized target configuration."""
+        return deepcopy(self.cfg)
+
+    def __get_repo_obj(self):
+        """
+        Gather the repository requested by the target configuration.
+
+        Returns:
+            github.Repository.Repository: repo object for current extraction op.
+
+        Raises:
+            RepoNotFoundError: repository does not exist or is inaccessible.
+        """
+        while True:
+            try:
+                repo_obj = self.gh_sesh.session.get_repo(self.repo_slug)
+            except github.RateLimitExceededException:
+                self.__sleep_extractor()
+            except github.UnknownObjectException as exc:
+                raise RepoNotFoundError(
+                    f'Cannot access "{self.repo_slug}". It either does not exist '
+                    "or is private."
+                ) from exc
+            else:
+                return repo_obj
+
+    def __get_issues_paged_list(self, repo_obj, num, state: str, labels: list[str]):
+        """
+        Retrieve and store a paginated list from GitHub.
+
+        Returns:
+            github.PaginatedList of github.Issue.
+        """
+        while True:
+            try:
+                # issues_paged_list = repo_obj.get_issues(
+                #     direction="asc",
+                #     sort="created",
+                #     state=state,
+                #     labels=labels,
+                # )
+
+                issue = repo_obj.get_issue(number=num)
+                if not (issue.state == state or issue.labels == labels):
+                    return []
+
+            except github.RateLimitExceededException:
+                self.__sleep_extractor()
+            except github.UnknownObjectException:
+                return []
+            else:
+                return [issue]
+
+    def __get_sanitized_cfg_range(self, repo) -> dict:
+        """
+        Ensure that target range bounds exist in the repository.
+
+        Returns:
+            dict: cleaned start and end range values.
+        """
+        print(f"{TAB}Sanitizing range for {self.repo_slug}...")
+
+        last_item_num = self.__get_last_item_num(repo)
+
+        print(f"{TAB * 2}Last item: #{last_item_num}")
+
+        range_cfg = self.cfg["range"]
+        requested_start = range_cfg["start"]
+        requested_end = range_cfg["end"]
+
+        if last_item_num == 0:
+            clean_range = {"start": requested_start, "end": 0}
+        else:
+            clean_start = min(requested_start, last_item_num)
+            effective_end = last_item_num if requested_end is None else requested_end
+            clean_end = min(effective_end, last_item_num)
+            clean_range = {"start": clean_start, "end": clean_end}
+
+        print(
+            f'{TAB * 2}Cleaned range: #{clean_range["start"]} '
+            f'to #{clean_range["end"]}'
+        )
+
+        return clean_range
+
+    def __get_last_item_num(self, repo) -> int:
+        """Return the newest issue or PR number in the repository."""
+        while True:
+            try:
+                issues_desc = repo.get_issues(
+                    direction="desc",
+                    sort="created",
+                    state="all",
+                )
+                newest_issue = next(iter(issues_desc), None)
+            except github.RateLimitExceededException:
+                self.__sleep_extractor()
+            else:
+                return newest_issue.number if newest_issue is not None else 0
+
+    @staticmethod
+    def __get_item_data(fields: list, cmd_tbl: dict, cur_item) -> dict:
+        """
+        Aggregate selected data fields from a given API item.
+
+        Args:
+            fields (list): configured field names to retrieve.
+            cmd_tbl (dict): dispatch table for the current item type.
+            cur_item (github API object): current API item to inspect.
+
+        Returns:
+            dict: dictionary of API data values for the given item.
+        """
+        return {field: cmd_tbl[field](cur_item) for field in fields}
+
+    def __collect_issue_data(self, issue) -> dict:
+        """Collect all configured data for a single issue or PR."""
+        func_schema = (
+            ("issues", self.__get_item_data),
+            ("commits", self.__get_issue_commits),
+            ("comments", self.__get_issue_comments),
+        )
+
+        cur_issue_data: dict = {}
+
+        for key, func in func_schema:
+            fields = self.cfg[key]
+
+            if fields:
+                cur_issue_data |= func(
+                    fields,
+                    schema.cmd_tbl[key],
+                    issue,
+                )
+
+        return cur_issue_data
+
+    def __flush_pending_output(self, repo_data_chunk: dict) -> None:
+        """
+        Flush pending repo-local output through the configured callback.
+
+        Args:
+            repo_data_chunk (dict): issue-number keyed data chunk to flush.
+        """
+        if not repo_data_chunk or self.flush_callback is None:
+            return
+
+        self.flush_callback(self.repo_slug, deepcopy(repo_data_chunk))
+
+    def __sleep_extractor(self) -> None:
+        """
+        Sleep until the rate limit on the GitHub account expires.
+
+        Notes:
+            If the system clock is inaccurate, this method cannot give an
+            accurate amount of time until limit reset.
+        """
+        print()
+
+        rate_limit = self.gh_sesh.get_remaining_ratelimit_time()
+        while rate_limit > 0:
+            minutes, seconds = divmod(rate_limit, 60)
+            cntdown_str = f"{minutes:02d}:{seconds:02d}"
+
+            print(
+                f"{CLR}{TAB}Time until limit reset: {cntdown_str}",
+                end="\r",
+            )
+
+            time.sleep(1)
+            rate_limit -= 1
+
+        while True:
+            try:
+                self.gh_sesh.session.get_user().id
+            except github.RateLimitExceededException:
+                print(
+                    f"{CLR}{TAB}Waiting for rate limit to lift...",
+                    end="\r",
+                )
+                time.sleep(10)
+            else:
+                cur_time = time.strftime("%I:%M:%S %p", time.localtime())
+                print(f"{CLR}{TAB}Rate limit lifted! The time is {cur_time}...")
+                return None
+
+    def extract_repo_data(self) -> dict:
+        """
+        Gather all configured data points for the current repository target.
+
+        Returns:
+            dict: repo-local extraction data keyed by issue or PR number.
+
+        Raises:
+            ExtractorError: a GitHub or socket error interrupted extraction
+                after pending output was flushed.
+            KeyboardInterrupt: re-raised after pending output is flushed.
+        """
+        repo_data: dict = {}
+        pending_output: dict = {}
+        issue_range = self.cfg["range"]
+
+        print(
+            f'{TAB}Starting mining for {self.repo_slug} '
+            f'at #{issue_range["start"]}...'
+        )
+
+        for cur_issue in self.paged_list:
+            while True:
+                try:
+                    cur_issue_data = self.__collect_issue_data(cur_issue)
+                except github.RateLimitExceededException:
+                    self.__flush_pending_output(pending_output)
+                    pending_output.clear()
+                    print()
+                    self.__sleep_extractor()
+                    continue
+                except KeyboardInterrupt:
+                    self.__flush_pending_output(pending_output)
+                    raise
+                except (
+                    github.GithubException,
+                    socket.error,
+                    socket.gaierror,
+                ) as exc:
+                    self.__flush_pending_output(pending_output)
+                    raise ExtractorError(
+                        f'Extraction failed for "{self.repo_slug}" '
+                        f"at item #{cur_issue.number}."
+                    ) from exc
+                else:
+                    issue_number = str(cur_issue.number)
+                    repo_data[issue_number] = cur_issue_data
+                    pending_output[issue_number] = cur_issue_data
+
+                    print(
+                        f"{CLR}{TAB * 2}Repo: {self.repo_slug}, "
+                        f"Issue: {cur_issue.number}, ",
+                        end="",
+                    )
+                    print(f"calls: {self.gh_sesh.get_remaining_calls()}", end="\r")
+                    break
+
+        self.__flush_pending_output(pending_output)
+        print()
+
+        return repo_data
+
+    def get_repo_issues_data(self) -> dict:
+        """Backward-compatible wrapper for repo-local extraction."""
+        return self.extract_repo_data()
+
+    def __get_issue_comments(self, fields: list, cmd_tbl: dict, issue) -> dict:
+        """
+        Get issue comment data for the given issue.
+
+        Args:
+            issue (github.issue): issue to gather data about.
+            fields (list): list of comment fields to gather from the issue.
+            cmd_tbl (dict): dict of {field: function to get field}.
+
+        Returns:
+            dict: dictionary of {comment index: comment data}.
+        """
+        comment_index = 0
+        cur_comment_data: dict = {}
+
+        for comment in issue.get_comments():
+            cur_entry = self.__get_item_data(fields, cmd_tbl, comment)
+            cur_comment_data[str(comment_index)] = cur_entry
+            comment_index += 1
+
+        return {"comments": cur_comment_data}
+
+    def __get_issue_commits(self, fields: list, cmd_tbl: dict, issue) -> dict:
+        """
+        Get issue commit data for the given issue.
+
+        Args:
+            issue (github.issue): issue to gather data about.
+            fields (list): list of commit fields to gather from the issue.
+            cmd_tbl (dict): dict of {field: function to get field}.
+
+        Returns:
+            dict: PR metadata and, if applicable, {commit index: commit data}.
+        """
+
+        def as_pr(cur_issue):
+            try:
+                cur_pr = cur_issue.as_pull_request()
+            except github.UnknownObjectException:
+                return None
+            else:
+                return cur_pr
+
+        def get_commit_data(pr_obj):
+            """Return commit data from a paginated list of commits from a PR."""
+            commit_index = 0
+            pr_commit_data: dict = {}
+
+            for commit in pr_obj.get_commits():
+                if commit.files:
+                    commit_datum = self.__get_item_data(fields, cmd_tbl, commit)
+                else:
+                    commit_datum = {}
+
+                pr_commit_data[str(commit_index)] = commit_datum
+                commit_index += 1
+
+            return {"commits": pr_commit_data}
+
+        pr_obj = as_pr(issue)
+
+        if pr_obj is not None:
+            pr_data = {
+                "is_pr": True,
+                "state": pr_obj.state,
+                "is_merged": pr_obj.merged,
+                "num_review_comments": pr_obj.comments,
+            }
+            pr_data |= get_commit_data(pr_obj)
+
+            return pr_data
+
+        return {"is_pr": False}
