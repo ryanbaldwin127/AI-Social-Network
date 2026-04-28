@@ -1,0 +1,46 @@
+{
+  "auth_path": "/path/to/personal_access_token.txt",
+  "output_path": "./docs/user/example_io/example_output.json",
+  "defaults": {
+    "state": "closed",
+    "labels": [],
+    "fields": {
+      "issues": [
+        "userlogin",
+        "userid",
+        "title",
+        "created_at",
+        "closed_at",
+        "num_comments"
+      ],
+      "comments": [
+        "body",
+        "userid",
+        "userlogin",
+        "created_at"
+      ],
+      "commits": [
+        "author_name",
+        "date",
+        "message",
+        "sha"
+      ]
+    }
+  },
+  "targets": [
+    {
+      "repo": "facebook/react",
+      "range": {
+        "start": 1,
+        "end": 2
+      }
+    },
+    {
+      "repo": "JabRef/jabref",
+      "range": {
+        "start": 150,
+        "end": 151
+      }
+    }
+  ]
+}
