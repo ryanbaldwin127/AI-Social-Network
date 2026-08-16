@@ -211,6 +211,10 @@ class Extractor:
                 self.__sleep_extractor()
             except github.UnknownObjectException:
                 return []
+            except github.GithubException as e:
+                if e.status == 410:
+                    return []
+                raise github.GithubException from e
             else:
                 return [issue]
 
