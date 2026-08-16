@@ -1,0 +1,5 @@
+{
+	"issue_data": "./data/input/OpenAI_Codex_combined.json",
+	"out_path": "./data/output/OpenAI_Codex_metrics_single_period.json",
+	"processing_method": "hybrid"
+}

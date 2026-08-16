@@ -1,0 +1,5 @@
+{
+	"issue_data": "./data/input/Cursor_combined.json",
+	"out_path": "./data/output/Cursor_metrics_single_period.json",
+	"processing_method": "hybrid"
+}

@@ -17,6 +17,7 @@ from metrics_aggregator.hybrid import (
     per_period as hybrid_period,
 )
 from metrics_aggregator.utils import file_io_utils as file_io
+from metrics_aggregator.utils import pass_input_data
 
 TAB = " " * 4
 PROCESSING_METHODS = {
@@ -52,6 +53,8 @@ def main():
         "per_issue": issue_processor.gather_all_issue_comm_metrics(issue_data),
         "per_period": period_processor.gather_all_period_comm_metrics(issue_data),
     }
+
+    pass_input_data.pass_input_data_to_per_issue(metrics, issue_data)
 
     file_io.write_dict_to_jsonfile(metrics, cfg["out_path"])
 
