@@ -1,0 +1,5 @@
+{
+	"issue_data": "./data/input/human_combined.json",
+	"out_path": "./data/output/human_metrics_single_period.json",
+	"processing_method": "hybrid"
+}

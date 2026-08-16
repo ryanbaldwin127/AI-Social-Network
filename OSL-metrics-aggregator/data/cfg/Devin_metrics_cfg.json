@@ -1,0 +1,5 @@
+{
+	"issue_data": "./data/input/Devin_combined.json",
+	"out_path": "./data/output/Devin_metrics_single_period.json",
+	"processing_method": "hybrid"
+}

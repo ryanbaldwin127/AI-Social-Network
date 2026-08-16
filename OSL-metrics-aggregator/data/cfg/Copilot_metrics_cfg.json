@@ -1,0 +1,5 @@
+{
+	"issue_data": "./data/input/Copilot_combined.json",
+	"out_path": "./data/output/Copilot_metrics_single_period.json",
+	"processing_method": "hybrid"
+}
