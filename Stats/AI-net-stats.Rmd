@@ -1,0 +1,456 @@
+---
+title: "AI-net-stats"
+output: html_document
+---
+```{r}
+library(jsonlite)
+library(RJSONIO)
+library(ggplot2)
+library(scales)
+library(dplyr)
+library(tidyverse)
+library(forcats)
+library(ggh4x)
+library(effsize)
+library(glmnet)
+library(pROC)
+
+set.seed(0)
+```
+
+Load metrics
+```{r}
+ai_metrics <- fromJSON("./inputs/ai_metrics_single_period.json")
+human_metrics <- fromJSON("./inputs/human_metrics_single_period.json")
+
+
+Claude_Code_metrics <- fromJSON("./inputs/Claude_Code_metrics_single_period.json")
+Copilot_metrics <- fromJSON("./inputs/Copilot_metrics_single_period.json")
+Cursor_metrics <- fromJSON("./inputs/Cursor_metrics_single_period.json")
+Devin_metrics <- fromJSON("./inputs/Devin_metrics_single_period.json")
+OpenAI_Codex_metrics <- fromJSON("./inputs/OpenAI_Codex_metrics_single_period.json")
+```
+
+1. [RQ1] Plot period metrics
+  Extract period data
+```{r}
+ai_period <- data.frame(ai_metrics$per_period[[1]][3:30])
+ai_period$count <- length(ai_metrics$per_issue)
+ai_period$type <- "AI"
+
+human_period <- data.frame(human_metrics$per_period[[1]][3:30])
+human_period$count <- length(human_metrics$per_issue)
+human_period$type <- "Human"
+
+Claude_Code_period <- data.frame(Claude_Code_metrics$per_period[[1]][3:30])
+Claude_Code_period$count <- length(Claude_Code_metrics$per_issue)
+Claude_Code_period$type <- "Claude Code"
+
+Copilot_period <- data.frame(Copilot_metrics$per_period[[1]][3:30])
+Copilot_period$count <- length(Copilot_metrics$per_issue)
+Copilot_period$type <- "Copilot"
+
+Cursor_period <- data.frame(Cursor_metrics$per_period[[1]][3:30])
+Cursor_period$count <- length(Cursor_metrics$per_issue)
+Cursor_period$type <- "Cursor"
+
+Devin_period <- data.frame(Devin_metrics$per_period[[1]][3:30])
+Devin_period$count <- length(Devin_metrics$per_issue)
+Devin_period$type <- "Devin"
+
+OpenAI_Codex_period <- data.frame(OpenAI_Codex_metrics$per_period[[1]][3:30])
+OpenAI_Codex_period$count <- length(OpenAI_Codex_metrics$per_issue)
+OpenAI_Codex_period$type <- "OpenAI Codex"
+
+all_period <- bind_rows(ai_period, human_period, Claude_Code_period, Copilot_period,
+                        Cursor_period, Devin_period, OpenAI_Codex_period)
+```
+
+  Create radio plot data
+```{r}
+all_period_ratio <- all_period %>% mutate(across(c("edges", "vertices"), ~ .x / count))
+
+all_period_ratio <- all_period_ratio %>% mutate(across(-type, ~ .x / .x[type == "Human"])) %>% pivot_longer(-type)
+
+all_period_ratio <- all_period_ratio %>%
+  mutate(category = case_when(
+    str_detect(name, "sum") ~ "SUMS",
+    str_detect(name, "constraint") ~ "Constraint Avg",
+    str_detect(name, "betweenness") ~ "Betweenness Avg",
+    str_detect(name, "closeness") ~ "Closeness Avg",
+    str_detect(name, "effective_size") ~ "Effective Size Avg",
+    str_detect(name, "efficiency") ~ "Efficiency Avg",
+    str_detect(name, "hierarchy") ~ "Hierarchy Avg",
+    str_detect(name, "edges") ~ "Average Edges",
+    str_detect(name, "vertices") ~ "Average Vertices",
+    TRUE ~ str_to_title(name)
+  )) %>% filter(str_detect(name, "avg") | name %in% c("edges", "vertices", "density", "diameter"))
+
+all_period_ratio <- all_period_ratio %>% group_by(category) %>% arrange(max(value))
+
+all_period_ratio$category <- reorder(all_period_ratio$category, all_period_ratio$value, FUN = mean)
+```
+
+```{r}
+ratio_plot <- ggplot(all_period_ratio) +
+  geom_vline(xintercept = 1, color = "red", alpha = 0.5) +
+  geom_point(aes(x = value, y = category, color=type), size = 3) +
+  scale_x_log10(labels = label_number()) +
+  labs(x = "Ratio of Human's Value",
+       y = "Metric",
+       color = "Agent") +
+  theme_classic()
+
+show(ratio_plot)
+ggsave(filename="./plots/metrics_ratio_plot.png", plot = ratio_plot)
+```
+
+  Unused plots
+```{r}
+all_period_reconfig <- all_period %>% pivot_longer(-type)
+
+all_period_reconfig <- all_period_reconfig %>% group_by(type) %>% mutate(value = if_else(name %in% c("edges", "vertices", "count"), value/value[name=="count"], value))
+
+all_period_reconfig <- all_period_reconfig %>%
+  mutate(category = case_when(
+    str_detect(name, "sum") ~ "SUMS",
+    str_detect(name, "constraint") ~ "Constraint",
+    str_detect(name, "betweenness") ~ "Betweenness",
+    str_detect(name, "closeness") ~ "Closeness",
+    str_detect(name, "effective_size") ~ "Effective Size",
+    str_detect(name, "efficiency") ~ "Efficiency",
+    str_detect(name, "hierarchy") ~ "Hierarchy",
+    str_detect(name, "edges") ~ "Average Edges",
+    str_detect(name, "vertices") ~ "Average Vertices",
+    TRUE ~ str_to_title(name)
+  )) %>% filter(str_detect(name, "avg") | name %in% c("edges", "vertices", "density", "diameter"))
+
+all_period_reconfig$category <- factor(all_period_reconfig$category, levels=unique(all_period_reconfig$category))
+```
+
+```{r}
+scales <- list(
+  all_period_reconfig$name == "edges" ~ scale_y_continuous(limits = c(0, 10)),
+  all_period_reconfig$name == "diameter" ~ scale_y_continuous(limits = c(0, 10)),
+  TRUE ~ scale_y_continuous(limits = c(0,1))
+)
+
+metrics_plot <- ggplot(all_period_reconfig %>% filter(type %in% c("AI", "Human")), aes(x=name, y = value, fill=type)) +
+  geom_col(position="dodge") + 
+  facet_wrap(~category, scales = "free") +
+  facetted_pos_scales(y = scales) +
+  scale_fill_brewer(palette="Pastel2") +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+show(metrics_plot)
+ggsave(filename="./plots/AIxHuman_metrics.png", plot = metrics_plot, height = 16, width = 12)
+```
+```{r}
+metrics_plot <- ggplot(all_period_reconfig %>% filter(!type %in% c("AI", "Human")), aes(x=name, y = value, fill=type)) +
+  geom_col(position="dodge") + 
+  facet_wrap(~category, scales = "free") +
+  facetted_pos_scales(y = scales) +
+  scale_fill_brewer(palette="Pastel1") +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+show(metrics_plot)
+ggsave(filename="./plots/agents_metrics.png", plot = metrics_plot, height = 16, width = 12)
+```
+
+2. [RQ1] Perform Mann-Whitney U test and Cliff Delta
+  Unpack issues data
+```{r}
+ai_issues <- as.data.frame(do.call(rbind, ai_metrics$per_issue))
+ai_issues <- cbind(ai_issues, do.call(rbind, ai_metrics$per_period[[1]]$per_period_issue))
+ai_issues$group <- "AI"
+
+human_issues <- as.data.frame(do.call(rbind, human_metrics$per_issue))
+human_issues <- cbind(human_issues, do.call(rbind, human_metrics$per_period[[1]]$per_period_issue))
+human_issues$group <- "Human"
+
+Claude_Code_issues <- as.data.frame(do.call(rbind, Claude_Code_metrics$per_issue))
+Claude_Code_issues <- cbind(Claude_Code_issues, do.call(rbind, Claude_Code_metrics$per_period[[1]]$per_period_issue))
+Claude_Code_issues$group <- "Claude Code"
+
+Copilot_issues <- as.data.frame(do.call(rbind, Copilot_metrics$per_issue))
+Copilot_issues <- cbind(Copilot_issues, do.call(rbind, Copilot_metrics$per_period[[1]]$per_period_issue))
+Copilot_issues$group <- "Copilot"
+
+Cursor_issues <- as.data.frame(do.call(rbind, Cursor_metrics$per_issue))
+Cursor_issues <- cbind(Cursor_issues, do.call(rbind, Cursor_metrics$per_period[[1]]$per_period_issue))
+Cursor_issues$group <- "Cursor"
+
+Devin_issues <- as.data.frame(do.call(rbind, Devin_metrics$per_issue))
+Devin_issues <- cbind(Devin_issues, do.call(rbind, Devin_metrics$per_period[[1]]$per_period_issue))
+Devin_issues$group <- "Devin"
+
+OpenAI_Codex_issues <- as.data.frame(do.call(rbind, OpenAI_Codex_metrics$per_issue))
+OpenAI_Codex_issues <- cbind(OpenAI_Codex_issues, do.call(rbind, OpenAI_Codex_metrics$per_period[[1]]$per_period_issue))
+OpenAI_Codex_issues$group <- "OpenAI Codex"
+
+all_issues <- rbind(ai_issues, human_issues, Claude_Code_issues, Copilot_issues,
+                    Cursor_issues, Devin_issues, OpenAI_Codex_issues)
+
+all_issues$density[all_issues$density == "NULL"] <- NA
+all_issues$merged_at[all_issues$merged == "NULL"] <- NA
+
+all_issues$group <- as.factor(all_issues$group)
+all_issues$merged <- ifelse(is.na(all_issues$merged_at), 0, 1)
+
+all_issues <- all_issues %>% select(-c("participants", "agent", "state", "html_url", "merged_at"))
+
+all_issues <- all_issues %>% mutate(across(-group, as.numeric))
+```
+
+  Run MW on each group pair for each metric
+```{r}
+MWC_U_tests <- data.frame()
+pairs_df <- data.frame(combn(unique(as.character(all_issues$group)), 2))
+
+for(col_name in colnames(pairs_df)){
+  #print(col_name)
+  pair <- pairs_df[[col_name]]
+  #print(pair)
+  MWC_pair <- lapply(select((all_issues %>% filter(group %in% pair)), -group, -merged),
+                     function(x){
+                       wilcox.test(
+                         x ~ (all_issues %>% filter(group %in% pair))$group,
+                         alternative="two.sided")
+                     }
+  )
+  
+  MWC_pair <- as.data.frame(do.call(rbind, MWC_pair))
+  MWC_U_tests <- rbind(MWC_U_tests, format(round(as.numeric(MWC_pair$p.value), 5), nsmall = 5, scientific = FALSE))
+  rownames(MWC_U_tests)[nrow(MWC_U_tests)] <- sprintf("%s x %s", pair[1], pair[2])
+  colnames(MWC_U_tests) <- rownames(MWC_pair)
+  MWC_U_tests[] <- lapply(MWC_U_tests, as.numeric)
+}
+```
+
+  Run cliff delta on each group pair for each metric
+```{r}
+cliff_tests <- data.frame()
+
+for(col_name in colnames(pairs_df)){
+  #print(col_name)
+  pair <- pairs_df[[col_name]]
+  #print(pair)
+  cliff_pair <- lapply(select((all_issues %>% filter(group %in% pair)), -group, -merged),
+                       function(x){
+                         cliff.delta(
+                           x ~ relevel(droplevels((all_issues %>% 
+                                                     filter(group %in% pair))$group),
+                                       pair[1])
+                         )
+                       }
+  )
+  
+  cliff_pair <- as.data.frame(do.call(rbind, cliff_pair))
+  cliff_tests <- rbind(cliff_tests, format(round(as.numeric(cliff_pair$estimate), 2), nsmall = 2, scientific = FALSE))
+  rownames(cliff_tests)[nrow(cliff_tests)] <- sprintf("%s x %s", pair[1], pair[2])
+  colnames(cliff_tests) <- rownames(cliff_pair)
+  cliff_tests[] <- lapply(cliff_tests, as.numeric)
+}
+```
+
+  Combine into a single table
+```{r}
+cliff_table <- mapply(paste, 
+                      cliff_tests,
+                      cliff_tests %>% mutate(across(everything(), ~ case_when(
+                        abs(.x) < 0.147 ~ "negligible",
+                        abs(.x) < 0.33 ~ "small",
+                        abs(.x) < 0.474 ~ "medium",
+                        TRUE ~ "large"))),
+                      MWC_U_tests %>% mutate(across(everything(), ~ case_when(
+                        .x < 0.001 ~ "***",
+                        .x < 0.01 ~ "**",
+                        .x < 0.05 ~ "*",
+                        TRUE ~ ""))),
+                      sep = " "
+)
+rownames(cliff_table) <- rownames(cliff_tests)
+```
+
+```{r}
+#write.csv(MWC_U_tests, "Mann-Whitney_U_tests.csv")
+#write.csv(cliff_tests, "cliff_tests.csv")
+write.csv(cliff_table, "cliff_table.csv")
+```
+
+3. [RQ2] Run regularization over issue metrics
+
+  Check baseline truth
+```{r}
+  sprintf("Human: %f", sum((all_issues %>% filter(group == "Human"))$merged) / nrow(all_issues %>% filter(group == "Human")))
+sprintf("AI: %f", sum((all_issues %>% filter(group == "AI"))$merged) / nrow(all_issues %>% filter(group == "AI")))
+```
+  Check human alone
+```{r}
+set.seed(0)
+norm_issues <- all_issues %>% filter(group %in% c("Human")) %>%mutate(across(where(is.numeric) & !merged, ~ as.vector(scale(.))))
+norm_issues$group <- droplevels(norm_issues$group)
+
+x <- model.matrix(merged ~ ., data = norm_issues %>% select(-vertices, -group))[,-1]
+y <- (norm_issues)$merged
+cv <- cv.glmnet(x, y, alpha = 0, family = "binomial", type.measure = "auc", standardize = FALSE)
+coefs <- coef(cv, s = "lambda.min")
+print(coefs)
+predictions <- predict(cv, newx = x, s = "lambda.min", type = "response")
+class_predictions <- ifelse(predictions > 0.5, 1, 0)
+accuracy <- mean(class_predictions == y)
+sprintf("Accuracy: %f", accuracy)
+i <- which(cv$lambda == cv$lambda.min)
+sprintf("cv auc: %f", cv$cvm[i])
+sprintf("sd: %f", cv$cvsd[i]/cv$cvm[1])
+auc(y, predictions)
+```
+
+  Check AI alone
+```{r}
+set.seed(0)
+norm_issues <- all_issues %>% filter(group %in% c("AI")) %>%mutate(across(where(is.numeric) & !merged, ~ as.vector(scale(.))))
+norm_issues$group <- droplevels(norm_issues$group)
+
+x <- model.matrix(merged ~ ., data = norm_issues %>% select(-vertices, -group))[,-1]
+y <- (norm_issues)$merged
+cv <- cv.glmnet(x, y, alpha = 0, family = "binomial", type.measure = "auc", standardize = FALSE)
+coefs <- coef(cv, s = "lambda.min")
+print(coefs)
+predictions <- predict(cv, newx = x, s = "lambda.min", type = "response")
+class_predictions <- ifelse(predictions > 0.5, 1, 0)
+accuracy <- mean(class_predictions == y)
+sprintf("Accuracy: %f", accuracy)
+i <- which(cv$lambda == cv$lambda.min)
+sprintf("cv auc: %f", cv$cvm[i])
+sprintf("sd: %f", cv$cvsd[i]/cv$cvm[1])
+auc(y, predictions)
+```
+
+  Do AI-Human regression
+```{r}
+set.seed(0)
+all_issues$density[is.na(all_issues$density)] <- 0
+norm_issues <- all_issues %>% filter(group %in% c("Human", "AI")) %>%mutate(across(where(is.numeric) & !merged, ~ as.vector(scale(.))))
+norm_issues$group <- droplevels(norm_issues$group)
+
+x <- model.matrix(merged ~ (. -group) * group, data = norm_issues %>% select(-vertices))[,-1]
+y <- (norm_issues)$merged
+cv <- cv.glmnet(x, y, alpha = 0, family = "binomial", type.measure = "auc", standardize = FALSE)
+coefs <- coef(cv, s = "lambda.min")
+print(coefs)
+
+predictions <- predict(cv, newx = x, s = "lambda.min", type = "response")
+class_predictions <- ifelse(predictions > 0.5, 1, 0)
+
+accuracy <- mean(class_predictions == y)
+sprintf("Accuracy: %f", accuracy)
+
+i <- which(cv$lambda == cv$lambda.min)
+sprintf("cv auc: %f", cv$cvm[i])
+sprintf("sd: %f", cv$cvsd[i]/cv$cvm[1])
+
+auc(y, predictions)
+```
+```{r}
+coef_vec <- as.numeric(coefs)[-c(1,16)]
+var_names <- (coefs@Dimnames[[1]])[2:15]
+
+AI_coef <- coef_vec[1:14]
+Human_coef <- AI_coef + coef_vec[15:28]
+
+coef_data <-data.frame(row.names = var_names, AI = AI_coef, Human = Human_coef)
+coef_data <- as.data.frame(t(coef_data))
+```
+
+```{r}
+coef_plot <- ggplot(coef_data 
+                    %>% rownames_to_column(var="group") 
+                    %>% pivot_longer(-group),
+                    aes(x=value, y=name)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
+  geom_line(aes(group=name)) +
+  geom_point(aes(color=group), size = 3) +
+  labs(x = "Estimated Effect Size on Merge Success",
+       y = "Metric",
+       color = "Agent") +
+  theme_classic()
+show(coef_plot)
+ggsave(filename="./plots/pool_interaction_AI-Human.png", plot = coef_plot)
+```
+  Add Codex and Devin into the regression
+```{r}
+set.seed(0)
+norm_issues <- all_issues %>% filter(group %in% c("Human", "AI", "Devin", "OpenAI Codex")) %>% mutate(across(where(is.numeric) & !merged, ~ as.vector(scale(.))))
+norm_issues$group <- droplevels(norm_issues$group)
+
+x <- model.matrix(merged ~ (. -group) * group, data = norm_issues %>% select(-vertices))[,-1]
+y <- (norm_issues)$merged
+cv <- cv.glmnet(x, y, alpha = 0, family = "binomial", type.measure = "auc", standardize = FALSE)
+coefs <- coef(cv, s = "lambda.min")
+print(coefs)
+
+predictions <- predict(cv, newx = x, s = "lambda.min", type = "response")
+class_predictions <- ifelse(predictions > 0.5, 1, 0)
+
+accuracy <- mean(class_predictions == y)
+sprintf("Accuracy: %f", accuracy)
+
+i <- which(cv$lambda == cv$lambda.min)
+sprintf("cv auc: %f", cv$cvm[i])
+sprintf("sd: %f", cv$cvsd[i]/cv$cvm[1])
+
+auc(y, predictions)
+```
+
+```{r}
+coef_vec <- as.numeric(coefs)[-c(1,16,17,18)]
+var_names <- (coefs@Dimnames[[1]])[2:15]
+
+AI_coef <- coef_vec[1:14]
+Devin_coef <- AI_coef + coef_vec[seq(from = 15, to = length(coef_vec), by = 3)]
+Human_coef <- AI_coef + coef_vec[seq(from = 16, to = length(coef_vec), by = 3)]
+Codex_ceof <- AI_coef + coef_vec[seq(from = 17, to = length(coef_vec), by = 3)]
+
+coef_data <-data.frame(row.names = var_names, AI = AI_coef, Human = Human_coef, Devin = Devin_coef, Codex = Codex_ceof)
+coef_data <- as.data.frame(t(coef_data))
+
+```
+
+```{r}
+
+plot_data <- coef_data %>% 
+  rownames_to_column(var = "group") %>% 
+  pivot_longer(-group) %>%
+  mutate(
+    y_base = as.numeric(as.factor(name)),
+    offset = case_when(
+      group == "AI" ~ 0.25,
+      group == "Human" ~ 0.25,
+      group == "Devin" ~ -0.25,
+      group == "Codex" ~ -0.25,
+      TRUE ~ 0.0
+    ),
+
+    y_custom = y_base + offset
+  )
+
+coef_plot <- ggplot(plot_data, aes(x = value, y = y_custom)) +
+  geom_hline(yintercept = seq(0.5, ncol(coef_data) + 0.5, by = 1), 
+             color = "gray80", 
+             linewidth = 0.5) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
+  geom_line(data = filter(plot_data, group %in% c("AI", "Human")),
+            aes(y = y_custom, group = name), 
+            color = "gray20") +
+  geom_point(aes(color = fct_relevel(group, "AI", "Codex" ,"Human")), size = 2.3) +
+  scale_y_continuous(
+    breaks = seq_along(unique(plot_data$name)),
+    labels = levels(as.factor(plot_data$name))) +
+  labs(x = "Estimated Effect Size on Merge Success",
+       y = "Metric",
+       color = "Agent") +
+  theme_classic()
+show(coef_plot)
+ggsave(filename="./plots/agent_coef_plot.png", plot = coef_plot)
+```
