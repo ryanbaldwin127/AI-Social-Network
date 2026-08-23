@@ -1,8 +1,6 @@
-# OSL Metrics Aggregator
+# Social Metrics Aggregator
 
 This tool derives social network metrics from issue data mined from the GitHub API v3.
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7740450.svg)](https://doi.org/10.5281/zenodo.7740450)
 
 ## How to run
 
