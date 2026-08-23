@@ -1,7 +1,7 @@
 # AI-Social-Network
 This repo is the replication package for the research on AI in open source software development using social network metrics.
 
-Source data can be found at:
+Source dataset can be found at:
 https://github.com/SAILResearch/AI_Teammates_in_SE3/tree/main
 
 Order to run programs:
