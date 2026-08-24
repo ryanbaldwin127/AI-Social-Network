@@ -1,0 +1,62 @@
+{
+    "auth_path": "./data/auth/my_auth.txt",
+    "output_path": "./data/output/testing.json",
+    "defaults": {
+        "state": "closed",
+        "labels": [],
+        "fields": {
+            "issues": [],
+            "comments": [
+                "body",
+                "userid",
+                "userlogin",
+                "created_at"
+            ],
+            "commits": []
+        }
+    },
+    "targets": [
+        {
+            "repo": "RockChinQ/LangBot",
+            "range": {
+                "start": 1259,
+                "end": 1259
+            }
+        },
+        {
+            "repo": "fake/repo",
+            "range":{
+                "start": 1,
+                "end": 1
+            }
+        },
+        {
+            "repo": "mangiucugna/json_repair",
+            "range": {
+                "start": 110,
+                "end": 110
+            }
+        },
+        {
+            "repo": "mangiucugna/json_repair",
+            "range": {
+                "start": 96,
+                "end": 96
+            }
+        },
+        {
+            "repo": "facebook/react",
+            "range": {
+                "start": 15,
+                "end": 15
+            }
+        },
+        {
+            "repo": "OpenHFT/Chronicle-Wire",
+            "range": {
+                "start": 1171,
+                "end": 1171
+            }
+        }
+    ]
+}

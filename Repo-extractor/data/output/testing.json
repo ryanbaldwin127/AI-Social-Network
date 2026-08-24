@@ -1,0 +1,43 @@
+{
+  "facebook/react": {
+    "15": {
+      "comments": {
+        "0": {
+          "body": "Whoa! First off, thanks for diving into this. And also for already signing the CLA :)\n\nSecondly (and this is totally on us for not communicating it well): we actually have our site being built with Jekyll and keep the raw files in the master branch @ https://github.com/facebook/react/tree/master/docs (there's a readme there for getting set up in case you aren't familiar with Ruby/Jekyll). Since we build from that, it's important that changes to documentation are actually made there, and then we compile that and check it into the gh-pages branch.\n",
+          "userid": "8445",
+          "userlogin": "zpao",
+          "created_at": "2013-05-30T17:16:51Z"
+        },
+        "1": {
+          "body": "Hi Paul. No problem. I realised the docs were built with Jekyll, I just generated the site, and created a pull request of the generated files in the `gh-pages` branch and not modifications to the raw files in the `master` branch. So not an issue with communication but more a “D’oh!” moment from me.\n\nHow would you like me to proceed? Create a separate pull request containing my changes to the docs’ raw files in the `master` branch? Will you then generate/update the `gh-pages` branch from there?\n",
+          "userid": "167312",
+          "userlogin": "martinbean",
+          "created_at": "2013-05-30T17:20:11Z"
+        },
+        "2": {
+          "body": "Yea, a separate pull request against `master` is probably best. I don't think GH lets you repurpose a pull request against a different branch.\n\nWe'll then update `gh-pages` separately (so far we've rolled up multiple changes into one commit there)\n",
+          "userid": "8445",
+          "userlogin": "zpao",
+          "created_at": "2013-05-30T18:19:03Z"
+        },
+        "3": {
+          "body": "OK. New Pull Request will be coming in just a few moments!\n",
+          "userid": "167312",
+          "userlogin": "martinbean",
+          "created_at": "2013-05-30T18:25:22Z"
+        },
+        "4": {
+          "body": "Updated pull request: #25.\n",
+          "userid": "167312",
+          "userlogin": "martinbean",
+          "created_at": "2013-05-30T18:32:31Z"
+        }
+      }
+    }
+  },
+  "OpenHFT/Chronicle-Wire": {
+    "1171": {
+      "comments": {}
+    }
+  }
+}
