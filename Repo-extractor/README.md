@@ -1,20 +1,6 @@
-# OSL Repo Extractor
+# Repo Extractor
 
 The GitHub Repo Extractor provides an expedient way to gather issue and PR data from GitHub repositories using the [GitHub REST API](https://docs.github.com/en/rest). See this repo's documentation for more information.
-
-## Academic Usage
-
-### Published Studies
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7571311.svg)](https://doi.org/10.5281/zenodo.7571311)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7740450.svg)](https://doi.org/10.5281/zenodo.7740450)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14184012.svg)](https://doi.org/10.5281/zenodo.14184012)
-
-### University Courses
-
-- Grand Canyon University: CST 301 (Principle of Programming Languages)
-- Grand Canyon University: CST 440 (Dynamic Social Network Analysis)
-- Colorado State University: CS 580B3 (AI for Software Engineering - Lab)
 
 ## Setup
 
